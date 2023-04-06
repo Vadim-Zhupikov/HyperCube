@@ -1,0 +1,107 @@
+import peasy.*;
+
+float angle = 0;
+PeasyCam cam;
+color[] gradientColors;
+boolean useGradientColors = false;
+
+void setup() {
+  size(800, 800, P3D);
+  cam = new PeasyCam(this, 300);
+  gradientColors = new color[] {color(255, 0, 0), color(0, 255, 0), color(0, 0, 255)};
+}
+
+void draw() {
+  background(255);
+  lights();
+  pushMatrix();
+  
+  // Проекция 4D на 3D
+  float[][] projected3D = new float[16][3];
+  for (int i = 0; i < 16; i++) {
+    float[] projected = project4DTo3D(tesseractPoints[i], angle);
+    projected3D[i] = projected;
+  }
+
+  // Рисуем ребра тессеракта
+ strokeWeight(2);
+  for (int[] edge : tesseractEdges) {
+    if (useGradientColors) {
+      stroke(lerpColor(gradientColors[edge[0] % gradientColors.length], gradientColors[edge[1] % gradientColors.length], 0.5));
+    } else {
+      stroke(0);
+    }
+    line(projected3D[edge[0]][0], projected3D[edge[0]][1], projected3D[edge[0]][2],
+         projected3D[edge[1]][0], projected3D[edge[1]][1], projected3D[edge[1]][2]);
+  }
+  
+  popMatrix();
+  angle += 0.01;
+}
+
+float[] project4DTo3D(float[] point4D, float angle) {
+  // Проекция 4D на 3D: поворот вдоль плоскости XY и XW
+  float[][] rotationXY = {
+    {cos(angle), -sin(angle), 0, 0},
+    {sin(angle), cos(angle), 0, 0},
+    {0, 0, 1, 0},
+    {0, 0, 0, 1}
+  };
+
+  float[][] rotationXW = {
+    {cos(angle), 0, 0, -sin(angle)},
+    {0, 1, 0, 0},
+    {0, 0, 1, 0},
+    {sin(angle), 0, 0, cos(angle)}
+  };
+  
+  float[] rotated4D = matmul(rotationXY, point4D);
+  rotated4D = matmul(rotationXW, rotated4D);
+
+  // Проекция 3D на 2D
+  float w = 4 * rotated4D[3] + 20;
+  float[] projected3D = {
+    rotated4D[0] * (w),
+    rotated4D[1] * (w),
+    rotated4D[2] * (w)
+  };
+  
+  return projected3D;
+}
+
+float[] matmul(float[][] a, float[] b) {
+  float[] result = new float[a.length];
+  for (int i = 0; i < a.length; i++) {
+    float sum = 0;
+    for (int j = 0; j < a[i].length; j++) {
+      sum += a[i][j] * b[j];
+    }
+    result[i] = sum;
+  }
+  return result;
+}
+
+// Точки тессеракта (16 вершин)
+float[][] tesseractPoints = {
+  {-1, -1, -1, -1}, {-1, -1, -1, 1}, {-1, -1, 1, -1}, {-1, -1, 1, 1},
+  {-1, 1, -1, -1}, {-1, 1, -1, 1}, {-1, 1, 1, -1}, {-1, 1, 1, 1},
+  {1, -1, -1, -1}, {1, -1, -1, 1}, {1, -1, 1, -1}, {1, -1, 1, 1},
+  {1, 1, -1, -1}, {1, 1, -1, 1}, {1, 1, 1, -1}, {1, 1, 1, 1}
+};
+
+// Ребра тессеракта (32 ребра)
+int[][] tesseractEdges = {
+  {0, 1}, {1, 3}, {3, 2}, {2, 0},
+  {4, 5}, {5, 7}, {7, 6}, {6, 4},
+  {0, 4}, {1, 5}, {3, 7}, {2, 6},
+  {8, 9}, {9, 11}, {11, 10}, {10, 8},
+  {12, 13}, {13, 15}, {15, 14}, {14, 12},
+  {8, 12}, {9, 13}, {11, 15}, {10, 14},
+  {0, 8}, {1, 9}, {3, 11}, {2, 10},
+  {4, 12}, {5, 13}, {7, 15}, {6, 14}
+};
+void keyPressed() {
+  if (key == 'c' || key == 'C') {
+    useGradientColors = !useGradientColors;
+  }
+}
